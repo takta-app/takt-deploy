@@ -118,17 +118,19 @@ upgrade() {
   local work
   work="$(mktemp -d)"
   trap 'rm -rf "$work"' RETURN
-  for f in compose.yaml up.sh down.sh backup-loop.sh setup.sh env.example NOTICE; do
+  for f in compose.yaml up.sh down.sh backup-loop.sh backup-files.sh audit-prune.sh pg-migrate-data-dir.sh setup.sh env.example NOTICE; do
     download_asset "$tag" "$f" "${work}/${f}" || {
       echo "Missing ${f} on ${tag}. Is the GitHub Release complete?" >&2
       exit 1
     }
   done
-  chmod +x "${work}/up.sh" "${work}/down.sh" "${work}/setup.sh"
+  chmod +x "${work}/up.sh" "${work}/down.sh" "${work}/setup.sh" \
+    "${work}/backup-files.sh" "${work}/audit-prune.sh"
   mv "${work}/env.example" "${work}/.env.example"
 
   merge_env .env "${work}/.env.example" .env "$version"
   cp "${work}/compose.yaml" "${work}/up.sh" "${work}/down.sh" "${work}/backup-loop.sh" \
+    "${work}/backup-files.sh" "${work}/audit-prune.sh" "${work}/pg-migrate-data-dir.sh" \
     "${work}/setup.sh" "${work}/.env.example" "${work}/NOTICE" .
 
   rm -rf "$work"

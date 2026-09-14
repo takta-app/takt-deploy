@@ -34,7 +34,7 @@ Du får en zip, `takt-deploy.zip`, från den som bjöd in dig. Den innehåller b
 unzip takt-deploy.zip
 cd takt-deploy
 ls
-# .env  .env.example  README.md  backup-loop.sh  cli/  compose.yaml  down.sh  up.sh
+# .env  .env.example  README.md  backup-loop.sh  pg-migrate-data-dir.sh  cli/  compose.yaml  down.sh  up.sh
 ```
 
 `.env` är dold i Finder/Utforskaren; `ls -a` i terminalen visar den.

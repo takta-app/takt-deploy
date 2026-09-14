@@ -9,10 +9,13 @@ services:
       POSTGRES_USER: takt
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-takt}
       POSTGRES_DB: takt
-      PGDATA: /var/lib/postgresql/data
+      PGDATA: /var/lib/postgresql/19/docker
     volumes:
-      - takt-install-postgres-data:/var/lib/postgresql/data
+      - takt-install-postgres-data:/var/lib/postgresql
       - takt-install-backups:/backups
+      - ./pg-migrate-data-dir.sh:/usr/local/bin/takt-pg-data.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/takt-pg-data.sh"]
+    command: ["postgres"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U takt -d takt"]
       interval: 5s
@@ -89,6 +92,7 @@ services:
       AUTH_MICROSOFT_ENTRA_ID_ID: ${AUTH_MICROSOFT_ENTRA_ID_ID:-}
       AUTH_MICROSOFT_ENTRA_ID_SECRET: ${AUTH_MICROSOFT_ENTRA_ID_SECRET:-}
       AUTH_MICROSOFT_ENTRA_ID_ISSUER: ${AUTH_MICROSOFT_ENTRA_ID_ISSUER:-}
+      AUTH_REQUIRE_ADMIN_MFA: ${AUTH_REQUIRE_ADMIN_MFA:-}
       S3_ENDPOINT: http://s3:8333
       S3_REGION: ${S3_REGION:-us-east-1}
       S3_ACCESS_KEY: ${S3_ACCESS_KEY:-takt}
