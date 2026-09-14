@@ -1,0 +1,127 @@
+# Production. App image from Docker Hub — no local Next.js build.
+# Isolated from root docker-compose.yml (dev Postgres on 5433).
+name: takt-install
+
+services:
+  postgres:
+    image: postgres:19beta3-alpine
+    environment:
+      POSTGRES_USER: takt
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-takt}
+      POSTGRES_DB: takt
+      PGDATA: /var/lib/postgresql/data
+    volumes:
+      - takt-install-postgres-data:/var/lib/postgresql/data
+      - takt-install-backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U takt -d takt"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  s3:
+    image: chrislusf/seaweedfs:4.46
+    command:
+      [
+        "mini",
+        "-dir=/data",
+        "-admin.user=${S3_ACCESS_KEY:-takt}",
+        "-admin.password=${S3_SECRET_KEY:-takt-s3-dev}",
+      ]
+    environment:
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-takt}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-takt-s3-dev}
+      S3_BUCKET: ${S3_BUCKET:-takt-files}
+    ports:
+      - "${S3_CONSOLE_PORT:-23646}:23646"
+    volumes:
+      - takt-install-s3-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "-q",
+          "-O",
+          "/dev/null",
+          "http://127.0.0.1:9333/cluster/status",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  backup:
+    image: postgres:19beta3-alpine
+    user: "0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: takt
+      PGPASSWORD: ${POSTGRES_PASSWORD:-takt}
+      PGDATABASE: takt
+      BACKUP_DIR: /backups
+      BACKUP_INTERVAL_SECS: "1800"
+      BACKUP_KEEP: "48"
+    volumes:
+      - takt-install-backups:/backups
+      - ./backup-loop.sh:/backup-loop.sh:ro
+    entrypoint: ["/bin/sh", "/backup-loop.sh"]
+    restart: unless-stopped
+    stop_grace_period: 10s
+
+  app:
+    image: ${TAKT_IMAGE:-mrweiland/takt}:${TAKT_VERSION:-0.1.0}
+    pull_policy: always
+    ports:
+      - "${TAKT_PORT:-3001}:${TAKT_PORT:-3001}"
+    environment:
+      NODE_ENV: production
+      PORT: ${TAKT_PORT:-3001}
+      DATABASE_URL: postgresql://takt:${POSTGRES_PASSWORD:-takt}@postgres:5432/takt
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3001}
+      NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3001}
+      AUTH_MICROSOFT_ENTRA_ID_ID: ${AUTH_MICROSOFT_ENTRA_ID_ID:-}
+      AUTH_MICROSOFT_ENTRA_ID_SECRET: ${AUTH_MICROSOFT_ENTRA_ID_SECRET:-}
+      AUTH_MICROSOFT_ENTRA_ID_ISSUER: ${AUTH_MICROSOFT_ENTRA_ID_ISSUER:-}
+      S3_ENDPOINT: http://s3:8333
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-takt}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-takt-s3-dev}
+      S3_BUCKET: ${S3_BUCKET:-takt-files}
+      S3_FORCE_PATH_STYLE: "true"
+      S3_CONSOLE_URL: ${S3_CONSOLE_URL:-http://localhost:23646}
+      AI_ENABLED: ${AI_ENABLED:-}
+      AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+      BACKUP_DIR: /backups
+    volumes:
+      - takt-install-backups:/backups:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      s3:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 300s
+    restart: unless-stopped
+
+volumes:
+  takt-install-postgres-data:
+  takt-install-s3-data:
+  takt-install-backups:

@@ -1,0 +1,6 @@
+The Compose scripts, setup.sh and documentation in this repository are
+licensed under Apache-2.0 (see LICENSE).
+
+The Takt application image (mrweiland/takt) and the takt CLI binaries are
+proprietary. You may run them under your Takt agreement. Do not redistribute
+the image or the CLI as your own product.
