@@ -1,5 +1,6 @@
 # Production. App image from Docker Hub — no local Next.js build.
-# Isolated from root docker-compose.yml (dev Postgres on 5433).
+# Isolated from root docker-compose.yml (dev: app 3001, S3 console 23646, Postgres 5433).
+# This stack publishes 3005 / 23647 / 5435 so both can run on one machine.
 name: takt-install
 
 services:
@@ -10,6 +11,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-takt}
       POSTGRES_DB: takt
       PGDATA: /var/lib/postgresql/19/docker
+    ports:
+      - "${POSTGRES_PORT:-5435}:5432"
     volumes:
       - takt-install-postgres-data:/var/lib/postgresql
       - takt-install-backups:/backups
@@ -37,7 +40,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-takt-s3-dev}
       S3_BUCKET: ${S3_BUCKET:-takt-files}
     ports:
-      - "${S3_CONSOLE_PORT:-23646}:23646"
+      - "${S3_CONSOLE_PORT:-23647}:23646"
     volumes:
       - takt-install-s3-data:/data
     healthcheck:
@@ -79,16 +82,16 @@ services:
 
   app:
     image: ${TAKT_IMAGE:-mrweiland/takt}:${TAKT_VERSION:-0.1.0}
-    pull_policy: always
+    pull_policy: missing
     ports:
-      - "${TAKT_PORT:-3001}:${TAKT_PORT:-3001}"
+      - "${TAKT_PORT:-3005}:${TAKT_PORT:-3005}"
     environment:
       NODE_ENV: production
-      PORT: ${TAKT_PORT:-3001}
+      PORT: ${TAKT_PORT:-3005}
       DATABASE_URL: postgresql://takt:${POSTGRES_PASSWORD:-takt}@postgres:5432/takt
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET is required}
-      AUTH_URL: ${AUTH_URL:-http://localhost:3001}
-      NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3001}
+      AUTH_URL: ${AUTH_URL:-http://localhost:3005}
+      NEXT_PUBLIC_APP_URL: ${AUTH_URL:-http://localhost:3005}
       AUTH_MICROSOFT_ENTRA_ID_ID: ${AUTH_MICROSOFT_ENTRA_ID_ID:-}
       AUTH_MICROSOFT_ENTRA_ID_SECRET: ${AUTH_MICROSOFT_ENTRA_ID_SECRET:-}
       AUTH_MICROSOFT_ENTRA_ID_ISSUER: ${AUTH_MICROSOFT_ENTRA_ID_ISSUER:-}
@@ -99,7 +102,7 @@ services:
       S3_SECRET_KEY: ${S3_SECRET_KEY:-takt-s3-dev}
       S3_BUCKET: ${S3_BUCKET:-takt-files}
       S3_FORCE_PATH_STYLE: "true"
-      S3_CONSOLE_URL: ${S3_CONSOLE_URL:-http://localhost:23646}
+      S3_CONSOLE_URL: ${S3_CONSOLE_URL:-http://localhost:23647}
       AI_ENABLED: ${AI_ENABLED:-}
       AI_GATEWAY_API_KEY: ${AI_GATEWAY_API_KEY:-}
       METRICS_TOKEN: ${METRICS_TOKEN:-}
@@ -117,7 +120,7 @@ services:
           "CMD",
           "node",
           "-e",
-          "fetch('http://127.0.0.1:'+(process.env.PORT||3001)+'/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+          "fetch('http://127.0.0.1:'+(process.env.PORT||3005)+'/api/health').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
         ]
       interval: 10s
       timeout: 5s

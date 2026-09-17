@@ -1,4 +1,4 @@
-The Compose scripts, setup.sh and documentation in this repository are
+The Compose files, helper scripts and documentation in this repository are
 licensed under Apache-2.0 (see LICENSE).
 
 The Takt application image (mrweiland/takt) and the takt CLI binaries are
